@@ -2,7 +2,7 @@ import { CacheEngine } from '@cache/cacheengine';
 import { Chatwoot, configService, ProviderSession } from '@config/env.config';
 import { eventEmitter } from '@config/event.config';
 import { Logger } from '@config/logger.config';
-
+import { MessageConsumerService } from 'src/messaging/services/messaging-consumer.service';
 import { BusinessController } from './controllers/business.controller';
 import { CallController } from './controllers/call.controller';
 import { ChatController } from './controllers/chat.controller';
@@ -71,6 +71,8 @@ export const waMonitor = new WAMonitoringService(
   chatwootCache,
   baileysCache,
 );
+
+export const messagingConsumerService = new MessageConsumerService(waMonitor);
 
 const s3Service = new S3Service(prismaRepository);
 export const s3Controller = new S3Controller(s3Service);

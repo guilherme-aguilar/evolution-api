@@ -5,7 +5,7 @@ import '@utils/instrumentSentry';
 import { ProviderFiles } from '@api/provider/sessions';
 import { PrismaRepository } from '@api/repository/repository.service';
 import { HttpStatus, router } from '@api/routes/index.router';
-import { eventManager, waMonitor } from '@api/server.module';
+import { eventManager, messagingConsumerService, waMonitor } from '@api/server.module';
 import { Auth, configService, Cors, HttpServer, ProviderSession, Webhook } from '@config/env.config';
 import { onUnexpectedError } from '@config/error.config';
 import { Logger } from '@config/logger.config';
@@ -25,6 +25,9 @@ function initWA() {
 async function bootstrap() {
   const logger = new Logger('SERVER');
   const app = express();
+
+  await messagingConsumerService.onModuleInit();
+  logger.info('RabbitMQ Messaging Consumer - ON');
 
   let providerFiles: ProviderFiles = null;
   if (configService.get<ProviderSession>('PROVIDER').ENABLED) {

@@ -3,8 +3,10 @@ import * as amqp from 'amqplib';
 import { Logger } from '@config/logger.config';
 import { QueuedMessage } from '../interfaces/message-queue.interface';
 import { WAMonitoringService } from '@api/services/monitor.service';
-import type { SendMediaDto, SendTextDto } from "@api/dto/sendMessage.dto";
+import { SendMediaDto, SendTextDto } from "@api/dto/sendMessage.dto";
 import { v4 as uuidv4 } from 'uuid'; // no topo do arquivo, se não estiver já
+import { validate } from 'jsonschema';
+import { textMessageSchema } from '@validate/message.schema';
 
 @Injectable()
 export class MessageConsumerService implements OnModuleInit, OnModuleDestroy {
@@ -76,7 +78,7 @@ export class MessageConsumerService implements OnModuleInit, OnModuleDestroy {
       // Exchange principal
       await this.channel.assertExchange(this.config.exchange, 'direct', {
         durable: true
-      });
+      }); 1
 
       // Todas as filas que o consumer precisa
       const queueOptions = {
@@ -234,9 +236,14 @@ export class MessageConsumerService implements OnModuleInit, OnModuleDestroy {
 
     switch (event) {
       case 'message_text':
-        const textData = requestData as SendTextDto;
-        result = await instance.textMessage(textData);
+        result = await this.dataValidateFromQueue<SendTextDto>(
+          requestData,
+          textMessageSchema,
+          SendTextDto,
+          async (data) => instance.textMessage(data)
+        );
         break;
+
 
       case 'message_media':
         const mediaData = requestData as SendMediaDto;
@@ -407,4 +414,27 @@ export class MessageConsumerService implements OnModuleInit, OnModuleDestroy {
       this.logger.error('Error closing RabbitMQ Consumer:' + error);
     }
   }
+
+  private async dataValidateFromQueue<T>(
+    rawData: any,
+    schema: any,
+    ClassRef: new () => T,
+    execute: (data: T) => Promise<any>
+  ): Promise<any> {
+    const instance = new ClassRef();
+    Object.assign(instance, rawData);
+
+    const validation = schema ? validate(instance, schema) : { valid: true, errors: [] };
+
+    if (!validation.valid) {
+      const message = validation.errors.map(({ stack, schema }) =>
+        schema?.description ?? stack.replace('instance.', '')
+      );
+      this.logger.error(`Validation failed: ${message}`);
+      throw new Error(`Validation failed: ${message.join(', ')}`);
+    }
+
+    return await execute(instance);
+  }
+
 }
